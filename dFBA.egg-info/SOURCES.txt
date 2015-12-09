@@ -1,8 +1,0 @@
-setup.py
-dFBA.egg-info/PKG-INFO
-dFBA.egg-info/SOURCES.txt
-dFBA.egg-info/dependency_links.txt
-dFBA.egg-info/top_level.txt
-sim/dfbasim.pyx
-sim/glpk.pyx
-sim/nvector.pyx

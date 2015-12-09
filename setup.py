@@ -35,7 +35,7 @@ extensions = [makeExtension(name) for name in extNames]
 setup(
   name="dFBA",
   ext_modules=extensions,
-  # cmdclass = {'build_ext': build_ext},
-  # script_args = ['build_ext'],
-  # options = {'build_ext':{'inplace':True, 'force':True}}
+  cmdclass = {'build_ext': build_ext},
+  script_args = ['build_ext'],
+  options = {'build_ext':{'inplace':True, 'force':True}}
 )

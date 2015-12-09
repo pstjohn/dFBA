@@ -38,6 +38,9 @@ cdef extern from "nvector/nvector_serial.h":
     ctypedef _N_VectorContent_Serial* N_VectorContent_Serial
 
 cdef void nv2arr(N_Vector v, np.ndarray[np.float_t, ndim=1] p)
+cdef void nv2mem_view(N_Vector v, np.float_t [:] p)
+cdef void mem_view2nv(N_Vector v, np.float_t [:] p)
 cdef void arr2nv(N_Vector v, np.ndarray[np.float_t, ndim=1] p)
 cdef void dls2np(DlsMat A, np.ndarray[np.float_t, ndim=2] P)
 cdef void np2dls(DlsMat A, np.ndarray[np.float_t, ndim=2] P)
+

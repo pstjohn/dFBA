@@ -2,6 +2,7 @@ import numpy as np
 cimport numpy as np
 
 cimport dFBA.sim.nvector as nv
+from dFBA.sim.ReactionBoundsFunction cimport ReactionBoundsFunction
 
 cdef class DFBA_Simulator:
     # cdef:
@@ -88,8 +89,12 @@ cdef class DFBA_Simulator:
         self.fba_prob.set_objective(c)
         
 
-        self._y0 = y0 # Store y0 for later re-initialization.
+        # Initialize ODE flags
         self._has_run = 0
+        self._has_found_ydot = 0
+
+        self._y0 = y0 # Store y0 for later re-initialization.
+
         self.bounds_func = bounds_func
         assert y0.shape[0] == reaction_indices.shape[0], "y0 and index shape mismatch"
         self.NEQ = y0.shape[0]
@@ -136,6 +141,7 @@ cdef class DFBA_Simulator:
         # Initialize output arrays
         self._ts = np.empty(res, dtype=np.float)
         self._ys = np.empty([res, self.NEQ], dtype=np.float)
+        self._ys_dot = np.empty([res, self.NEQ], dtype=np.float)
 
         self._ts = np.linspace(t, t_out, res)
 
@@ -157,6 +163,7 @@ cdef class DFBA_Simulator:
             if iout >= res: break
 
         self._has_run = 1
+        self._has_found_ydot = 0
         return 0
 
 
@@ -188,6 +195,41 @@ cdef class DFBA_Simulator:
 
     property ts:
         def __get__(self): return np.asarray(self._ts)
+
+    property ys_dot:
+        def __get__(self):
+
+            if self._has_found_ydot == 0:
+                self.get_ydot()
+
+            return np.asarray(self._ys_dot)
+
+    cdef int get_ydot(self):
+        """ Get the derivative at each time step """
+        assert self._has_run == 1, "Integration has not yet run"
+
+        cdef int i
+        cdef N_Vector yi
+        cdef N_Vector yi_dot
+        yi = N_VNew_Serial(self.NEQ)
+        yi_dot = N_VNew_Serial(self.NEQ)
+
+        try:
+
+            for i in range(self._ts.shape[0]):
+
+                # Call function derivative for the current yi
+                nv.mem_view2nv(yi, self._ys[i,:])
+                f(<realtype> self._ts[i], yi, yi_dot, <void*> self)
+                nv.nv2mem_view(yi_dot, self._ys_dot[i,:])
+
+        finally:
+            # Clean up N_Vectors
+            N_VDestroy_Serial(yi)
+            N_VDestroy_Serial(yi_dot)
+
+        return 0 
+
 
 
     cpdef void print_final_stats(self):
@@ -230,19 +272,19 @@ cdef int f(realtype t, N_Vector y_nv, N_Vector ydot_nv, void *user_data):
     return 0
 
 
-cdef class ReactionBoundsFunction:
-    cdef int evaluate(self, realtype* y, 
-                      double [:] lb_e, 
-                      double [:] ub_e): 
-        """ A user-defined function which updates the lower and upper bound of the
-        metabolic exchange fluxes.
+# cdef class ReactionBoundsFunction:
+#     cdef int evaluate(self, realtype* y, 
+#                       double [:] lb_e, 
+#                       double [:] ub_e): 
+#         """ A user-defined function which updates the lower and upper bound of the
+#         metabolic exchange fluxes.
         
-        The current external concentrations, y, are passed as inputs. lb_e and ub_e
-        are passed with their current (default) values, so only active bounds need
-        to be changed.
-        """
+#         The current external concentrations, y, are passed as inputs. lb_e and ub_e
+#         are passed with their current (default) values, so only active bounds need
+#         to be changed.
+#         """
 
-        return 0
+#         return 0
     
 
 
