@@ -6,6 +6,6 @@ At each integration point, a LP is solved to find the optimum fluxes through the
 
 ## Dependencies
 
-        * GLPK v. 4.57 (Homebrew installed)
-        * SUNDIALS v. 2.6.2 
-        * opencobra/cobrapy
+* GLPK v. 4.57 (Homebrew installed)
+* SUNDIALS v. 2.6.2 
+* opencobra/cobrapy
