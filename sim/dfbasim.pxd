@@ -23,7 +23,7 @@ cdef class DFBA_Simulator:
 
         ReactionBoundsFunction bounds_func
 
-    cpdef int integrate(self, realtype t_out, int res)
-    cdef int find_external_fluxes(self, realtype* y)
-    cpdef void print_final_stats(self)
-    cdef int get_ydot(self)
+    cpdef int integrate(self, realtype t_out, int res) except -1
+    cdef int find_external_fluxes(self, realtype* y) except -1
+    cpdef int print_final_stats(self) except -1
+    cdef int get_ydot(self) except -1

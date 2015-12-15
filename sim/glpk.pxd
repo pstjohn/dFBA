@@ -6,12 +6,12 @@ cdef class GLPKfba:
     cdef glp_prob *lp
     cdef glp_smcp *opt
     cdef int m, n
-    cdef int set_objective(self, np.ndarray[np.float_t, ndim=1] c)
+    cdef int set_objective(self, np.ndarray[np.float_t, ndim=1] c) except -1
     cdef int set_bounds(self, 
                         np.ndarray[np.float_t, ndim=1] lb,
-                        np.ndarray[np.float_t, ndim=1] ub)
-    cdef int set_bounds_i(self, int i, float lb, float ub)
-    cdef int solve(self)
+                        np.ndarray[np.float_t, ndim=1] ub) except -1
+    cdef int set_bounds_i(self, int i, float lb, float ub) except -1
+    cdef int solve(self) except -1
     cdef double get_objective(self)
     cdef np.float_t [:] get_fluxes(self)
     cdef float get_flux_i(self, int i)
@@ -48,4 +48,7 @@ cdef extern from "glpk.h":
 
 
     enum: GLP_MAX, GLP_UP, GLP_LO, GLP_MSG_OFF, GLP_FX, GLP_DB
+
+    enum: GLP_EBADB, GLP_ESING, GLP_ECOND, GLP_EBOUND, GLP_EFAIL, GLP_EOBJLL
+    enum: GLP_EOBJUL, GLP_EITLIM, GLP_ETMLIM, GLP_ENOPFS, GLP_ENODFS
 

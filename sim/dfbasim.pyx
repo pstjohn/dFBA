@@ -38,56 +38,9 @@ cdef class DFBA_Simulator:
 
 
         ## Initialize Linear Programming Object.
-        # Should I move this to the GLPK class?
-
-        # Parse cobra_model
-        cdef int nm, nr, i, j, tot_size
-        cdef float stoich
-        nm = len(cobra_model.metabolites)
-        nr = len(cobra_model.reactions)
-
-        # Initialize objective, bounds, and stoich containters
-        cdef np.ndarray[np.float_t, ndim=1] c  = np.empty(nr, dtype=np.float)
-        cdef np.ndarray[np.float_t, ndim=1] lb = np.empty(nr, dtype=np.float)
-        cdef np.ndarray[np.float_t, ndim=1] ub = np.empty(nr, dtype=np.float)
-
-        # glpk wants the indexing to start at 1 for some reason.
-        ia_list = [0.]
-        ja_list = [0.]
-        ar_list = [0.]
-
-        # Fill containers
-        for j in xrange(nr):
-            reaction = cobra_model.reactions[j]
-            c[j] = reaction.objective_coefficient
-            ub[j] = reaction.upper_bound
-            lb[j] = reaction.lower_bound
-            for metabolite, stoich in reaction.metabolites.iteritems():
-                i = cobra_model.metabolites.index(metabolite.id)
-                ia_list += [i+1]
-                ja_list += [j+1]
-                ar_list += [stoich]
-
-        # Allocate+fill sparse numpy arrays for stoich
-        tot_size = len(ia_list)
-
-        cdef np.ndarray[np.int32_t,   ndim=1, mode="c"] ia = \
-            np.zeros(tot_size, dtype=np.int32)
-        cdef np.ndarray[np.int32_t,   ndim=1, mode="c"] ja = \
-            np.zeros(tot_size, dtype=np.int32)
-        cdef np.ndarray[np.float64_t, ndim=1, mode="c"] ar = \
-            np.zeros(tot_size, dtype=np.float64)
-
-        for i in xrange(tot_size):
-            ia[i] = ia_list[i]
-            ja[i] = ja_list[i]
-            ar[i] = ar_list[i]
 
         # Initialize LP solution
-        self.fba_prob = glp.GLPKfba(ia, ja, ar, nm, nr)
-        self.fba_prob.set_bounds(lb, ub)
-        self.fba_prob.set_objective(c)
-        
+        self.fba_prob = glp.GLPKfba(cobra_model)
 
         # Initialize ODE flags
         self._has_run = 0
@@ -105,8 +58,8 @@ cdef class DFBA_Simulator:
         self.lb_e = np.empty(reaction_indices.shape[0])
         self.v_e = np.empty(reaction_indices.shape[0])
         for i in range(reaction_indices.shape[0]):
-            self.ub_e[i] = ub[reaction_indices[i]]
-            self.lb_e[i] = lb[reaction_indices[i]]
+            self.ub_e[i] = cobra_model.reactions[reaction_indices[i]].upper_bound
+            self.lb_e[i] = cobra_model.reactions[reaction_indices[i]].lower_bound
 
         self.y = N_VNew_Serial(self.NEQ)
         nv.arr2nv(self.y, y0)
@@ -128,7 +81,7 @@ cdef class DFBA_Simulator:
         flag = CVDense(self.cvode_mem, self.NEQ)
         # flag = CVDlsSetDenseJacFn(self.cvode_mem, Jac)
 
-    cpdef int integrate(self, realtype t_out, int res):
+    cpdef int integrate(self, realtype t_out, int res) except -1:
 
         cdef realtype t = 0.
         cdef realtype tnext = 0.
@@ -168,7 +121,7 @@ cdef class DFBA_Simulator:
 
 
 
-    cdef int find_external_fluxes(self, realtype* y):
+    cdef int find_external_fluxes(self, realtype* y) except -1:
         """ Calculate the optimal external exchange fluxes for the given y, and
         return the fluxes in self.v_e. Makes use of the *hopefully* external
         external_reaction_bounds """
@@ -190,6 +143,8 @@ cdef class DFBA_Simulator:
 
         return 0
 
+    def _test_fba_solution(self): self.fba_prob.solve()
+
     property ys:
         def __get__(self): return np.asarray(self._ys)
 
@@ -204,7 +159,7 @@ cdef class DFBA_Simulator:
 
             return np.asarray(self._ys_dot)
 
-    cdef int get_ydot(self):
+    cdef int get_ydot(self) except -1:
         """ Get the derivative at each time step """
         assert self._has_run == 1, "Integration has not yet run"
 
@@ -232,7 +187,7 @@ cdef class DFBA_Simulator:
 
 
 
-    cpdef void print_final_stats(self):
+    cpdef int print_final_stats(self) except -1:
 
         cdef long nst, nfe, nsetups, nje, nfeLS, nni, ncfn, netf
 
@@ -251,6 +206,8 @@ cdef class DFBA_Simulator:
             nst, nfe, nsetups, nfeLS, nje)
         print "nni = %-6ld ncfn = %-6ld netf = %-6ld\n" %  (nni, ncfn, netf)
 
+        return 0
+
 
 cdef int f(realtype t, N_Vector y_nv, N_Vector ydot_nv, void *user_data):
     
@@ -259,7 +216,13 @@ cdef int f(realtype t, N_Vector y_nv, N_Vector ydot_nv, void *user_data):
     cdef realtype* ydot = (<N_VectorContent_Serial>ydot_nv.content).data
     cdef DFBA_Simulator self = <DFBA_Simulator> user_data
 
-    self.find_external_fluxes(y)
+    try:
+        self.find_external_fluxes(y)
+    except RuntimeWarning as ex:
+        return +1
+    except RuntimeError as ex:
+        print ex
+        return -1
 
     # Biomass growth
     ydot[0] = y[0] * self.v_e[0]
