@@ -224,11 +224,8 @@ cdef int f(realtype t, N_Vector y_nv, N_Vector ydot_nv, void *user_data):
         print ex
         return -1
 
-    # Biomass growth
-    ydot[0] = y[0] * self.v_e[0]
-
     cdef int i = 0
-    for i in range(1, self.NEQ):
+    for i in range(0, self.NEQ):
         ydot[i] = y[0] * self.v_e[i]
         
 
