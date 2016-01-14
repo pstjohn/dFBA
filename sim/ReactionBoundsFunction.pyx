@@ -1,4 +1,15 @@
+import numpy as np
+cimport numpy as np
+
 cdef class ReactionBoundsFunction:
+    def __init__(self, np.ndarray[np.float_t, ndim=1] parameters):
+        """Initialize the reaction bounds function with a vector of parameters,
+        which can be used in the 'evaluate' procedure.
+        """
+
+        self.p = parameters
+
+
     cdef int evaluate(self, realtype* y, double [:] lb_e, double [:] ub_e):
         """ A user-defined function which updates the lower and upper bound of the
         metabolic exchange fluxes.

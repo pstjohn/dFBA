@@ -6,6 +6,6 @@ cdef class GlucoseUptake(ReactionBoundsFunction):
                       double [:] ub_e): 
 
         # Glucose MM uptake.
-        lb_e[1] = -10 * y[1] / (0.5 + y[1])
+        lb_e[1] = -self.p[0] * y[1] / (self.p[1] + y[1])
 
         return 0

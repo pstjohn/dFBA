@@ -21,6 +21,7 @@ y0 = [
     # 50.,   # Phosphate
 ]
 
+parameters = np.array([10, 0.5])
 
 from dFBA import DFBA_Simulator
 from rbf import GlucoseUptake
@@ -28,7 +29,7 @@ from rbf import GlucoseUptake
 dfbasimulator = DFBA_Simulator(model, 
                                np.array(external_indicies, dtype=np.int32),
                                np.array(y0),
-                               GlucoseUptake())
+                               GlucoseUptake(parameters))
 
 dfbasimulator.integrate(10., 20)
 

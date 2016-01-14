@@ -26,9 +26,9 @@ cdef extern from "sundials/sundials_direct.h":
 
     ctypedef _DlsMat* DlsMat
 
-    void PrintMat(DlsMat A);
-    DlsMat NewDenseMat(long M, long N);
-    void DestroyMat(DlsMat A);
+    void PrintMat(DlsMat A)
+    DlsMat NewDenseMat(long M, long N)
+    void DestroyMat(DlsMat A)
 
 cdef extern from "nvector/nvector_serial.h":
     cdef struct _N_VectorContent_Serial:
