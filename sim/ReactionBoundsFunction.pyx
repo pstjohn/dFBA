@@ -3,8 +3,8 @@ cimport numpy as np
 
 cdef class ReactionBoundsFunction:
     def __init__(self, np.ndarray[np.float_t, ndim=1] parameters):
-        """Initialize the reaction bounds function with a vector of parameters,
-        which can be used in the 'evaluate' procedure.
+        """ Initialize the reaction bounds function with a vector of
+        parameters, which can be used in the 'evaluate' procedure.
         """
 
         self.p = parameters

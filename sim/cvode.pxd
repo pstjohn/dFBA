@@ -69,12 +69,16 @@ cdef extern from "cvode/cvode.h":
     int CVodeGetNumNonlinSolvConvFails(void *cvode_mem, long *nncfails)
    
 
-    enum: CV_ADAMS
-    enum: CV_BDF
-    enum: CV_NEWTON
+    enum: CV_ADAMS, CV_BDF, CV_NEWTON
 
-    enum: CV_NORMAL
-    enum: CV_SUCCESS
+    enum: CV_NORMAL, CV_SUCCESS
+
+    enum: CV_TOO_MUCH_ACC, CV_ERR_FAILURE, CV_CONV_FAILURE, CV_LINIT_FAIL
+    enum: CV_TOO_MUCH_WORK, CV_LSETUP_FAIL, CV_LSOLVE_FAIL, CV_RHSFUNC_FAIL
+    enum: CV_FIRST_RHSFUNC_ERR, CV_REPTD_RHSFUNC_ERR, CV_UNREC_RHSFUNC_ERR
+    enum: CV_RTFUNC_FAIL, CV_MEM_FAIL, CV_MEM_NULL, CV_ILL_INPUT
+    enum: CV_NO_MALLOC, CV_BAD_K, CV_BAD_T, CV_BAD_DKY, CV_TOO_CLOSE
+
     
     
 cdef extern from "cvode/cvode_direct.h":

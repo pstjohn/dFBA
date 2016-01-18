@@ -21,7 +21,7 @@ y0 = [
     # 50.,   # Phosphate
 ]
 
-parameters = np.array([10, 0.5])
+parameters = np.array([5, 2])
 
 from dFBA import DFBA_Simulator
 from rbf import GlucoseUptake
@@ -29,9 +29,15 @@ from rbf import GlucoseUptake
 dfbasimulator = DFBA_Simulator(model, 
                                np.array(external_indicies, dtype=np.int32),
                                np.array(y0),
-                               GlucoseUptake(parameters))
+                               GlucoseUptake(
+                                   np.array(parameters, dtype=np.float)),
+                               collect_fluxes=True)
 
-dfbasimulator.integrate(10., 20)
+# This command should generate a python warning, and issue a CVodes Error
+# indicating the function evaluation failed. This is due to the fact that
+# biomass growth is not possible once glucose concetation falls to a critical
+# threshold
+dfbasimulator.integrate(t_end=10., res=20)
 
 print dfbasimulator.ys[:,:2]
 

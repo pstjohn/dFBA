@@ -85,6 +85,24 @@ cdef class GLPKfba:
         # Silence the GLP output
         glp_term_hook(silent_hook, NULL)
 
+    def update_from_model(self, cobra_model):
+        """ Update the lp objective from a cobra model """
+
+        cdef int nr = self.n
+
+        cdef np.ndarray[np.float_t, ndim=1] c  = np.empty(nr, dtype=np.float)
+        cdef np.ndarray[np.float_t, ndim=1] lb = np.empty(nr, dtype=np.float)
+        cdef np.ndarray[np.float_t, ndim=1] ub = np.empty(nr, dtype=np.float)
+
+        for j in xrange(nr):
+            reaction = cobra_model.reactions[j]
+            c[j] = reaction.objective_coefficient
+            ub[j] = reaction.upper_bound
+            lb[j] = reaction.lower_bound
+
+        self.set_objective(c)
+        self.set_bounds(lb, ub)
+
     cdef int set_objective(self, np.ndarray[np.float_t, ndim=1] c) except -1:
 
         # Check input argument
@@ -118,13 +136,17 @@ cdef class GLPKfba:
         glp_set_col_bnds(self.lp, i+1, GLP_DB, lb, ub)
         return 0
 
-    cdef int solve(self) except -1:
+    cdef int solve(self):
 
         cdef int flag
         flag = glp_simplex(self.lp, NULL)
         check_simplex_flag(flag)
+        
+        # Check status of LP solution
+        flag = self.get_status()       
 
-        return 0
+        return check_lp_flag(flag)
+
 
     cdef double get_objective(self): return glp_get_obj_val(self.lp)
 
@@ -139,6 +161,11 @@ cdef class GLPKfba:
     cdef float get_flux_i(self, int i): return glp_get_col_prim(self.lp, i+1)
 
 
+    # Status indicators
+    cdef int get_status(self):    return glp_get_status(self.lp)
+    cdef int get_prim_stat(self): return glp_get_prim_stat(self.lp)
+    cdef int get_dual_stat(self): return glp_get_dual_stat(self.lp)
+    
             
 
             
@@ -173,7 +200,7 @@ cdef int silent_hook(void *info, const char *s):
 
 
 cdef int check_simplex_flag(int flag) except -1:
-    if flag == 0: return 1
+    if flag == 0: return 0
 
     elif flag == GLP_EBADB:
         raise RuntimeError('GLP: Unable to start the search, because the initial basis speci- fied in the problem object is invalid—the number of basic (auxiliary and structural) variables is not the same as the number of rows in the problem object.')
@@ -197,6 +224,26 @@ cdef int check_simplex_flag(int flag) except -1:
         raise RuntimeWarning('GLP: The LP problem instance has no primal feasible solution (only elif the LP presolver is used).')
     elif flag == GLP_ENODFS:
         raise RuntimeWarning('GLP: The LP problem instance has no dual feasible solution (only elif the LP presolver is used).')
+
+    return -1
+
+
+cdef int check_lp_flag(int flag):
+    if flag == GLP_OPT: return 0
+    if flag == GLP_FEAS: return 0
+
+    # elif flag == GLP_FEAS:   raise RuntimeWarning("solution is feasible")
+    # elif flag == GLP_INFEAS: raise RuntimeWarning("solution is infeasible")
+    # elif flag == GLP_NOFEAS: raise RuntimeWarning("no feasible solution exists")
+    # elif flag == GLP_OPT:    raise RuntimeWarning("solution is optimal")
+    # elif flag == GLP_UNBND:  raise RuntimeWarning("solution is unbounded")
+
+    return -1
+   
+        
+
+
+
 
 
         # # /* declare variables */

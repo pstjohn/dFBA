@@ -11,10 +11,15 @@ cdef class GLPKfba:
                         np.ndarray[np.float_t, ndim=1] lb,
                         np.ndarray[np.float_t, ndim=1] ub) except -1
     cdef int set_bounds_i(self, int i, float lb, float ub) except -1
-    cdef int solve(self) except -1
+    cdef int solve(self)
     cdef double get_objective(self)
     cdef np.float_t [:] get_fluxes(self)
     cdef float get_flux_i(self, int i)
+
+    cdef int get_status(self)
+    cdef int get_prim_stat(self)
+    cdef int get_dual_stat(self)
+    
 
 cdef extern from "glpk.h":
     ctypedef struct glp_prob
@@ -44,11 +49,17 @@ cdef extern from "glpk.h":
     glp_prob *glp_create_prob()
     void glp_delete_prob(glp_prob *P)
     int glp_free_env()
-    void glp_term_hook(int (*func)(void *info, const char *s), void *info);
+    void glp_term_hook(int (*func)(void *info, const char *s), void *info)
+    int glp_get_status(glp_prob *P)
+    int glp_get_prim_stat(glp_prob *P)
+    int glp_get_dual_stat(glp_prob *P)
+
 
 
     enum: GLP_MAX, GLP_UP, GLP_LO, GLP_MSG_OFF, GLP_FX, GLP_DB
 
     enum: GLP_EBADB, GLP_ESING, GLP_ECOND, GLP_EBOUND, GLP_EFAIL, GLP_EOBJLL
     enum: GLP_EOBJUL, GLP_EITLIM, GLP_ETMLIM, GLP_ENOPFS, GLP_ENODFS
+
+    enum: GLP_UNDEF, GLP_FEAS, GLP_INFEAS, GLP_NOFEAS, GLP_OPT, GLP_UNBND
 
