@@ -47,11 +47,6 @@ cdef class DFBA_Simulator:
         self._has_run = 0
         self._has_found_ydot = 0
 
-        # Initialize flux collection if requested
-        if collect_fluxes:
-            self._collect_fluxes = 1
-            self.NV = len(cobra_model.reactions)
-
         self._y0 = y0 # Store y0 for later re-initialization.
 
         # Initialize death rate
@@ -60,6 +55,7 @@ cdef class DFBA_Simulator:
         self.bounds_func = bounds_func
         assert y0.shape[0] == reaction_indices.shape[0], "y0 and index shape mismatch"
         self.NEQ = y0.shape[0]
+        self.NV = len(cobra_model.reactions)
 
         # Initialize external reaction variables
         self.reaction_indices = reaction_indices
@@ -128,13 +124,11 @@ cdef class DFBA_Simulator:
         self._ts = np.empty(res, dtype=np.float)
         self._ys = np.empty([res, self.NEQ], dtype=np.float)
         self._ys_dot = np.empty([res, self.NEQ], dtype=np.float)
+        self._vs = np.empty([res, self.NV], dtype=np.float)
 
         self._ys[:] = NAN
         self._ys_dot[:] = NAN
-
-
-        if self._collect_fluxes:
-            self._vs = np.empty([res, self.NV], dtype=np.float)
+        self._vs[:] = NAN
 
         self._ts = np.linspace(t_start, t_end, res)
 
@@ -151,11 +145,6 @@ cdef class DFBA_Simulator:
                 # Store solution vector
                 for i in range(self.NEQ):
                     self._ys[iout, i] = NV_Ith_S(self.y, i)
-
-                # Store optimal flux vector
-                if self._collect_fluxes:
-                    for i in range(self.NV):
-                        self._vs[iout, i] = self.fba_prob.get_flux_i(i)
 
                 iout += 1
 
@@ -207,9 +196,35 @@ cdef class DFBA_Simulator:
 
     property vs:
         def __get__(self): 
-            if self._collect_fluxes:
-                return np.asarray(self._vs)
-            else: raise RuntimeWarning('Fluxes not collected')
+            self.get_vs()
+            return np.asarray(self._vs)
+
+    cdef int get_vs(self) except -1:
+        """ Get fluxes at each time step """
+
+        cdef int i, j
+        cdef int index = 0, flag
+        cdef np.float_t[:] y = np.empty(self.NEQ, dtype=np.float)
+
+        for i in range(self._ts.shape[0]):
+
+            for j in range(self.NEQ): y[j] = self._ys[i,j]
+
+            # Use external enzyme chemistry to find new upper and lower bounds
+            self.bounds_func.evaluate(&y[0], self.lb_e, self.ub_e)
+
+            # Propogate external bounds to linear program
+            for j in range(self.NEQ):
+                index = self.reaction_indices[j]
+                self.fba_prob.set_bounds_i(index, self.lb_e[j], self.ub_e[j])
+
+            flag = self.fba_prob.solve()
+            if flag < 0: continue
+
+            for j in range(self.NV):
+                self._vs[i,j] = self.fba_prob.get_flux_i(j)
+
+        return 0
 
     property ts:
         def __get__(self): return np.asarray(self._ts)

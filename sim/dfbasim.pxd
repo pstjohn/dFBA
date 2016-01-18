@@ -30,6 +30,7 @@ cdef class DFBA_Simulator:
     cdef int find_external_fluxes(self, realtype* y)
     cpdef int print_final_stats(self) except -1
     cdef int get_ydot(self) except -1
+    cdef int get_vs(self) except -1
     cpdef void reset(self)
     cdef int _initialize_cvodes(self, realtype t0)
     cpdef void set_death_rate(self, realtype death_rate)
