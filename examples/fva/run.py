@@ -24,7 +24,7 @@ y0 = [
 parameters = np.array([5, 2], dtype=np.float)
 
 from rbf import GlucoseUptake
-from dFBA.sim.dfvasim import DFVA_Simulator
+from dFBA import DFVA_Simulator
 
 dfva = DFVA_Simulator(model, external_indicies, y0, GlucoseUptake(parameters),
                       .99)
