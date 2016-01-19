@@ -108,10 +108,14 @@ cdef class GLPKfba:
         # Check input argument
         assert c.shape[0] == self.n, "Objective vector length mismatch"
 
-        for j in xrange(self.n):
+        cdef int j
+        for j in range(self.n):
             glp_set_obj_coef(self.lp, j+1, c[j])
 
         return 0
+    
+    cdef int set_obj_i(self, int j, double obj):
+        glp_set_obj_coef(self.lp, j+1, obj)
 
     cdef int set_bounds(self, 
                         np.ndarray[np.float_t, ndim=1] lb,
@@ -122,7 +126,7 @@ cdef class GLPKfba:
         assert ub.shape[0] == self.n, "Upper-bound vector length mismatch"
 
         cdef int j
-        for j in xrange(self.n):
+        for j in range(self.n):
             if lb[j] == ub[j]:
                 glp_set_col_bnds(self.lp, j+1, GLP_FX, lb[j], ub[j])
             elif lb[j] < ub[j]:
@@ -136,21 +140,23 @@ cdef class GLPKfba:
         glp_set_col_bnds(self.lp, i+1, GLP_DB, lb, ub)
         return 0
 
-    cdef int solve(self):
+    cpdef int solve(self):
 
         cdef int flag
         flag = glp_simplex(self.lp, NULL)
-        check_simplex_flag(flag)
+
+        # If there was an error, break
+        flag = check_simplex_flag(flag)
+        if flag == -1: return -1
         
         # Check status of LP solution
         flag = self.get_status()       
-
         return check_lp_flag(flag)
 
 
     cdef double get_objective(self): return glp_get_obj_val(self.lp)
 
-    cdef np.float_t [:] get_fluxes(self):
+    cpdef np.ndarray[np.float_t, ndim=1] get_fluxes(self):
 
         cdef np.ndarray[np.float_t, ndim=1] col_prim = np.empty(self.n, dtype=np.float)
         cdef int j
@@ -159,6 +165,10 @@ cdef class GLPKfba:
         return col_prim
 
     cdef float get_flux_i(self, int i): return glp_get_col_prim(self.lp, i+1)
+
+    cdef double get_lb_i(self, int i): return glp_get_col_lb(self.lp, i+1)
+    cdef double get_ub_i(self, int i): return glp_get_col_ub(self.lp, i+1)
+
 
 
     # Status indicators

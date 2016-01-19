@@ -25,6 +25,7 @@ def makeExtension(extName):
                       numpy.get_include()],
         library_dirs=['/Users/pstjohn/Packages/sundials_install/lib'],
         libraries=['sundials_cvode', 'sundials_nvecserial', 'glpk'],
+        extra_compile_args=["-w"]
         )
 
 

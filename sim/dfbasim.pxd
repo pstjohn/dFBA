@@ -4,6 +4,9 @@ cimport numpy as np
 cimport dFBA.sim.glpk as glp
 from dFBA.sim.cvode cimport *
 from dFBA.sim.ReactionBoundsFunction cimport ReactionBoundsFunction
+cimport dFBA.sim.nvector as nv
+
+from warnings import warn
 
 cdef class DFBA_Simulator:
     cdef:

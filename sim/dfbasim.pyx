@@ -1,27 +1,7 @@
 import numpy as np
-cimport numpy as np
-
 from warnings import warn
 
-cimport dFBA.sim.nvector as nv
-from dFBA.sim.ReactionBoundsFunction cimport ReactionBoundsFunction
-
 cdef class DFBA_Simulator:
-    # cdef:
-    #     void *cvode_mem
-    #     int flag, flagr, iout, NEQ, NOUT, _has_run
-    #     N_Vector y
-    #     glp.GLPKfba fba_prob
-    #     np.int32_t [:] reaction_indices
-    #     np.float_t [:] ub_e
-    #     np.float_t [:] lb_e
-    #     np.float_t [:] v_e
-
-    #     np.float_t [:] _y0
-    #     np.float_t [:] _ts
-    #     np.float_t [:, :] _ys
-
-    #     ReactionBoundsFunction bounds_func
 
     def __cinit__(self):
         self.cvode_mem = CVodeCreate(CV_BDF, CV_NEWTON)
@@ -35,13 +15,30 @@ cdef class DFBA_Simulator:
     def __init__(self, cobra_model, 
                  np.ndarray[np.int32_t, ndim=1] reaction_indices,
                  np.ndarray[np.float_t, ndim=1] y0, 
-                 ReactionBoundsFunction bounds_func,
-                 collect_fluxes=False,
+                 ReactionBoundsFunction bounds_func
                  ):
+        """ A class to handle the solution of the dynamic flux balance problem
+        specified by the passed cobra_model and bounds_func.
+        
+        cobra_model: a cobra.Model object
+            A model containing the mass balance reactions
 
+        reaction_indicies: a numpy array
+            A list of indicies corresponding to the external metabolites to be
+            tracked
 
-        # Initialize LP solution
-        self.fba_prob = glp.GLPKfba(cobra_model)
+        y0: a numpy array
+            An array of initial conditions for the specified external metabolites
+
+        bounds_func: a ReactionBoundsFunction
+            A function that specifies the uptake kinetics of the external
+            metabolites. Specifically, this function adjusts the upper and
+            lower bounds of the exchange rates as a function of current
+            concentration.
+
+        """
+
+        self._initialize_lp(cobra_model)
 
         # Initialize ODE flags
         self._has_run = 0
@@ -68,6 +65,12 @@ cdef class DFBA_Simulator:
 
         self.y = N_VNew_Serial(self.NEQ)
         nv.arr2nv(self.y, y0)
+
+    def _initialize_lp(self, cobra_model):
+        """ Initialize LP solution. (Placed in separate method for inheretance)
+        """
+        self.fba_prob = glp.GLPKfba(cobra_model)
+        
 
 
     def update_bounds_func_parameters(self, np.ndarray[np.float_t, ndim=1]

@@ -30,8 +30,7 @@ dfbasimulator = DFBA_Simulator(model,
                                np.array(external_indicies, dtype=np.int32),
                                np.array(y0),
                                GlucoseUptake(
-                                   np.array(parameters, dtype=np.float)),
-                               collect_fluxes=True)
+                                   np.array(parameters, dtype=np.float)))
 
 # This command should generate a python warning, and issue a CVodes Error
 # indicating the function evaluation failed. This is due to the fact that
