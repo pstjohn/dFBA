@@ -133,11 +133,20 @@ cdef class GLPKfba:
                 glp_set_col_bnds(self.lp, j+1, GLP_DB, lb[j], ub[j])
             else:
                 raise RuntimeError("GLP: Reaction bounds infeasible")
+                return -1
 
         return 0
 
     cdef int set_bounds_i(self, int i, float lb, float ub) except -1:
-        glp_set_col_bnds(self.lp, i+1, GLP_DB, lb, ub)
+
+        if lb == ub:
+            glp_set_col_bnds(self.lp, i+1, GLP_FX, lb, ub)
+        elif lb < ub:
+            glp_set_col_bnds(self.lp, i+1, GLP_DB, lb, ub)
+        else:
+            raise RuntimeError("GLP: Reaction bounds infeasible")
+            return -1
+
         return 0
 
     cpdef int solve(self):
