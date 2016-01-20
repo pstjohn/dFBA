@@ -61,6 +61,7 @@ class DFVA_Simulator(object):
         number of samples """
 
         self.res = res
+        self.ts = np.linspace(t_start, t_end, res)
         
         for direction in ['max', 'min']:
             for index in self.reaction_indicies:
