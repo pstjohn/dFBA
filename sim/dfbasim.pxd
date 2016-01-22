@@ -12,7 +12,7 @@ cdef class DFBA_Simulator:
     cdef:
         void *cvode_mem
         int flag, flagr, iout, NEQ, NOUT, _has_run, _has_found_ydot,
-        int _collect_fluxes, NV
+        int _collect_fluxes, NV, verbosity
         N_Vector y
         glp.GLPKfba fba_prob
         np.int32_t [:] reaction_indices

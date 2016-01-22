@@ -10,7 +10,7 @@ cdef class GLPKfva(GLPKfba):
         np.float_t[:] c_outer
         np.float_t[:] lb_orig
         np.float_t[:] ub_orig
-    
+
         double fva_tol
 
     cpdef int solve(self)

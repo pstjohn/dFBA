@@ -2,6 +2,7 @@ from libc.stdio cimport printf
 import numpy as np
 cimport numpy as np
 
+import logging
 
 cdef class GLPKfba:
 
@@ -12,7 +13,7 @@ cdef class GLPKfba:
         glp_delete_prob(self.lp)
         # glp_free_env()
 
-    def __init__(self, cobra_model):
+    def __init__(self, cobra_model, int verbosity):
         """ Initialize the class with the stochiometric matrix A, and
         initialize the GLP problem """
 
@@ -21,6 +22,8 @@ cdef class GLPKfba:
         cdef float stoich
         nm = len(cobra_model.metabolites)
         nr = len(cobra_model.reactions)
+
+        self.verbosity = verbosity
 
         # Initialize objective, bounds, and stoich containters
         cdef np.ndarray[np.float_t, ndim=1] c  = np.empty(nr, dtype=np.float)
@@ -103,7 +106,7 @@ cdef class GLPKfba:
         self.set_objective(c)
         self.set_bounds(lb, ub)
 
-    cdef int set_objective(self, np.ndarray[np.float_t, ndim=1] c) except -1:
+    cdef int set_objective(self, np.ndarray[np.float_t, ndim=1] c):
 
         # Check input argument
         assert c.shape[0] == self.n, "Objective vector length mismatch"
@@ -119,7 +122,7 @@ cdef class GLPKfba:
 
     cdef int set_bounds(self, 
                         np.ndarray[np.float_t, ndim=1] lb,
-                        np.ndarray[np.float_t, ndim=1] ub) except -1:
+                        np.ndarray[np.float_t, ndim=1] ub):
 
         # Check input argument
         assert lb.shape[0] == self.n, "Lower-bound vector length mismatch"
@@ -132,19 +135,19 @@ cdef class GLPKfba:
             elif lb[j] < ub[j]:
                 glp_set_col_bnds(self.lp, j+1, GLP_DB, lb[j], ub[j])
             else:
-                raise RuntimeError("GLP: Reaction bounds infeasible")
+                logging.error("GLP: Reaction bounds infeasible")
                 return -1
 
         return 0
 
-    cdef int set_bounds_i(self, int i, float lb, float ub) except -1:
+    cdef int set_bounds_i(self, int i, float lb, float ub):
 
         if lb == ub:
             glp_set_col_bnds(self.lp, i+1, GLP_FX, lb, ub)
         elif lb < ub:
             glp_set_col_bnds(self.lp, i+1, GLP_DB, lb, ub)
         else:
-            raise RuntimeError("GLP: Reaction bounds infeasible")
+            logging.error("GLP: Reaction bounds infeasible")
             return -1
 
         return 0
@@ -155,12 +158,12 @@ cdef class GLPKfba:
         flag = glp_simplex(self.lp, NULL)
 
         # If there was an error, break
-        flag = check_simplex_flag(flag)
+        flag = check_simplex_flag(flag, self.verbosity)
         if flag == -1: return -1
         
         # Check status of LP solution
         flag = self.get_status()       
-        return check_lp_flag(flag)
+        return check_lp_flag(flag, self.verbosity)
 
 
     cdef double get_objective(self): return glp_get_obj_val(self.lp)
@@ -218,44 +221,46 @@ cdef int silent_hook(void *info, const char *s):
 
 
 
-cdef int check_simplex_flag(int flag) except -1:
+cdef int check_simplex_flag(int flag, int verbosity):
     if flag == 0: return 0
 
-    elif flag == GLP_EBADB:
-        raise RuntimeError('GLP: Unable to start the search, because the initial basis speci- fied in the problem object is invalid—the number of basic (auxiliary and structural) variables is not the same as the number of rows in the problem object.')
-    elif flag == GLP_ESING:
-        raise RuntimeError('GLP: Unable to start the search, because the basis matrix corresponding to the initial basis is singular within the working precision.')
-    elif flag == GLP_ECOND:
-        raise RuntimeError('GLP: Unable to start the search, because the basis matrix corresponding to the initial basis is ill-conditioned, i.e. its condition number is too large.')
-    elif flag == GLP_EBOUND:
-        raise RuntimeError('GLP: Unable to start the search, because some double-bounded (auxiliary or structural) variables have incorrect bounds.')
-    elif flag == GLP_EFAIL:
-        raise RuntimeWarning('GLP: The search was prematurely terminated due to the solver failure.')
-    elif flag == GLP_EOBJLL:
-        raise RuntimeWarning('GLP: The search was prematurely terminated, because the objective function being maximized has reached its lower limit and continues decreasing (the dual simplex only).')
-    elif flag == GLP_EOBJUL:
-        raise RuntimeWarning('GLP: The search was prematurely terminated, because the objective function being minimized has reached its upper limit and continues increasing (the dual simplex only).')
-    elif flag == GLP_EITLIM:
-        raise RuntimeWarning('GLP: The search was prematurely terminated, because the simplex iteration limit has been exceeded.')
-    elif flag == GLP_ETMLIM:
-        raise RuntimeWarning('GLP: The search was prematurely terminated, because the time limit has been exceeded.')
-    elif flag == GLP_ENOPFS:
-        raise RuntimeWarning('GLP: The LP problem instance has no primal feasible solution (only elif the LP presolver is used).')
-    elif flag == GLP_ENODFS:
-        raise RuntimeWarning('GLP: The LP problem instance has no dual feasible solution (only elif the LP presolver is used).')
+    if verbosity == 1:
+        if flag == GLP_EBADB:
+            logging.error('GLP: Unable to start the search, because the initial basis speci- fied in the problem object is invalid—the number of basic (auxiliary and structural) variables is not the same as the number of rows in the problem object.')
+        elif flag == GLP_ESING:
+            logging.error('GLP: Unable to start the search, because the basis matrix corresponding to the initial basis is singular within the working precision.')
+        elif flag == GLP_ECOND:
+            logging.error('GLP: Unable to start the search, because the basis matrix corresponding to the initial basis is ill-conditioned, i.e. its condition number is too large.')
+        elif flag == GLP_EBOUND:
+            logging.error('GLP: Unable to start the search, because some double-bounded (auxiliary or structural) variables have incorrect bounds.')
+        elif flag == GLP_EFAIL:
+            logging.error('GLP: The search was prematurely terminated due to the solver failure.')
+        elif flag == GLP_EOBJLL:
+            logging.error('GLP: The search was prematurely terminated, because the objective function being maximized has reached its lower limit and continues decreasing (the dual simplex only).')
+        elif flag == GLP_EOBJUL:
+            logging.error('GLP: The search was prematurely terminated, because the objective function being minimized has reached its upper limit and continues increasing (the dual simplex only).')
+        elif flag == GLP_EITLIM:
+            logging.error('GLP: The search was prematurely terminated, because the simplex iteration limit has been exceeded.')
+        elif flag == GLP_ETMLIM:
+            logging.error('GLP: The search was prematurely terminated, because the time limit has been exceeded.')
+        elif flag == GLP_ENOPFS:
+            logging.error('GLP: The LP problem instance has no primal feasible solution (only elif the LP presolver is used).')
+        elif flag == GLP_ENODFS:
+            logging.error('GLP: The LP problem instance has no dual feasible solution (only elif the LP presolver is used).')
 
     return -1
 
 
-cdef int check_lp_flag(int flag):
+cdef int check_lp_flag(int flag, int verbosity):
     if flag == GLP_OPT: return 0
     if flag == GLP_FEAS: return 0
 
-    # elif flag == GLP_FEAS:   raise RuntimeWarning("solution is feasible")
-    # elif flag == GLP_INFEAS: raise RuntimeWarning("solution is infeasible")
-    # elif flag == GLP_NOFEAS: raise RuntimeWarning("no feasible solution exists")
-    # elif flag == GLP_OPT:    raise RuntimeWarning("solution is optimal")
-    # elif flag == GLP_UNBND:  raise RuntimeWarning("solution is unbounded")
+    if verbosity == 1:
+        if flag == GLP_FEAS:     logging.error("GLP: Solution is feasible")
+        elif flag == GLP_INFEAS: logging.error("GLP: Solution is infeasible")
+        elif flag == GLP_NOFEAS: logging.error("GLP: No feasible solution exists")
+        elif flag == GLP_OPT:    logging.error("GLP: Solution is optimal")
+        elif flag == GLP_UNBND:  logging.error("GLP: Solution is unbounded")
 
     return -1
    

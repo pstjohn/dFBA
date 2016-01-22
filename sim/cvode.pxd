@@ -43,6 +43,8 @@ cdef extern from "cvode/cvode.h":
              N_Vector y, N_Vector fy,  
              DlsMat Jac, void *user_data, 
              N_Vector tmp1, N_Vector tmp2, N_Vector tmp3)
+    ctypedef void (*CVErrHandlerFn)(int error_code, const char *module, const
+                                    char *function, char *msg, void *eh_data)
 
     # Core solver functions
     void* CVodeCreate(int lmm, int iter)
@@ -59,6 +61,8 @@ cdef extern from "cvode/cvode.h":
     int CVodeSStolerances(void *cvode_mem, realtype reltol, realtype abstol)
     int CVodeRootInit(void *cvode_mem, int nrtfn, CVRootFn g)
     int CVDlsSetDenseJacFn(void *cvode_mem, CVDlsDenseJacFn jac)
+    int CVodeSetErrHandlerFn(void *cvode_mem, CVErrHandlerFn ehfun, void *eh_data)
+    int CVodeSetMinStep(void *cvode_mem, realtype hmin)
 
     # Solver Stats Functions
     int CVodeGetNumSteps(void *cvode_mem, long *nsteps)

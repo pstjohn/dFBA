@@ -5,7 +5,7 @@ from .dfvasim_base import DFVA_Simulator_base
 class DFVA_Simulator(object):
 
     def __init__(self, cobra_model, reaction_indicies, y0, bounds_func,
-                 fva_tol=0.99):
+                 fva_tol=0.99, verbosity=True):
         """ A class to handle the solution of the dynamic flux variablity
         analysis given in the passed model.
         
@@ -25,6 +25,9 @@ class DFVA_Simulator(object):
             metabolites. Specifically, this function adjusts the upper and
             lower bounds of the exchange rates as a function of current
             concentration.
+
+        verbosity: int or bool
+            Whether or not to log output of the integrations
         
         """
 
@@ -38,7 +41,8 @@ class DFVA_Simulator(object):
         c_inner = np.array([r.objective_coefficient for r in
                             cobra_model.reactions])
 
-        for index in self.reaction_indicies:
+        # Assume biomass is the first reaction index
+        for index in self.reaction_indicies[1:]:
 
             # Initialize outer objectives
             c_maximize = np.zeros(self.NV)
@@ -49,11 +53,11 @@ class DFVA_Simulator(object):
             # Initialize DFVA_core objects
             self._fva_dict['max'][index] = DFVA_Simulator_base(
                 cobra_model, self.reaction_indicies, np.asarray(y0),
-                bounds_func, c_inner, c_maximize, self.fva_tol)
+                bounds_func, c_inner, c_maximize, self.fva_tol, verbosity)
 
             self._fva_dict['min'][index] = DFVA_Simulator_base(
                 cobra_model, self.reaction_indicies, np.asarray(y0),
-                bounds_func, c_inner, c_minimize, self.fva_tol)
+                bounds_func, c_inner, c_minimize, self.fva_tol, verbosity)
 
 
     def integrate(self, t_start=0., t_end=1., res=200):
@@ -64,7 +68,7 @@ class DFVA_Simulator(object):
         self.ts = np.linspace(t_start, t_end, res)
         
         for direction in ['max', 'min']:
-            for index in self.reaction_indicies:
+            for index in self.reaction_indicies[1:]:
                 self._fva_dict[direction][index].integrate(
                     t_start=float(t_start), t_end=float(t_end), res=int(res))
     
@@ -72,7 +76,7 @@ class DFVA_Simulator(object):
         """ Set the death rate for each of the fva sub-problems """
 
         for direction in ['max', 'min']:
-            for index in self.reaction_indicies:
+            for index in self.reaction_indicies[1:]:
                 self._fva_dict[direction][index].set_death_rate(float(death_rate))
         
     def update_bounds_func_parameters(self, parameters):
@@ -80,7 +84,7 @@ class DFVA_Simulator(object):
         """
 
         for direction in ['max', 'min']:
-            for index in self.reaction_indicies:
+            for index in self.reaction_indicies[1:]:
                 self._fva_dict[direction][index].update_bounds_func_parameters(
                     np.asarray(parameters, dtype=np.float))
 
@@ -89,21 +93,29 @@ class DFVA_Simulator(object):
         initialization """
 
         for direction in ['max', 'min']:
-            for index in self.reaction_indicies:
+            for index in self.reaction_indicies[1:]:
                 self._fva_dict[direction][index].reset()
     
     def _get_result(self, direction, result):
 
         property_shape = getattr(
-            self._fva_dict[direction][self.reaction_indicies[0]], result).shape
+            self._fva_dict[direction][self.reaction_indicies[1]], result).shape
 
         assert property_shape[1] == self.NEQ, "Result shape mismatch"
 
         out_arr = np.empty(property_shape)
 
-        for i, index in enumerate(self.reaction_indicies):
-            out_arr[:,i] = getattr(self._fva_dict[direction][index],
-                                   result)[:,i]
+        for i, index in enumerate(self.reaction_indicies[1:]):
+            out_arr[:,i+1] = getattr(self._fva_dict[direction][index],
+                                   result)[:,i+1]
+
+        biomass_arr = np.array([
+            getattr(self._fva_dict[direction][index], result)[:,0] 
+            for index in self.reaction_indicies[1:]])
+
+        if direction == 'max':   out_arr[:,0] = biomass_arr.max(0)
+        elif direction == 'min': out_arr[:,0] = biomass_arr.min(0)
+
         return out_arr
 
     @property

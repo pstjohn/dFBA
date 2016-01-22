@@ -9,6 +9,7 @@ cdef class DFVA_Simulator_base(DFBA_Simulator):
                  np.ndarray[np.float_t, ndim=1] c_inner,
                  np.ndarray[np.float_t, ndim=1] c_outer,
                  double fva_tol=.99,
+                 verbosity=True,
                  ):
 
         self.c_inner = c_inner
@@ -16,7 +17,7 @@ cdef class DFVA_Simulator_base(DFBA_Simulator):
         self.fva_tol = fva_tol
 
         DFBA_Simulator.__init__(self, cobra_model, reaction_indices, y0,
-                                bounds_func)
+                                bounds_func, verbosity)
     
 
     def _initialize_lp(self, cobra_model):
@@ -24,7 +25,8 @@ cdef class DFVA_Simulator_base(DFBA_Simulator):
 
         cdef np.ndarray[np.float_t, ndim=1] c_inner = np.asarray(self.c_inner)
         cdef np.ndarray[np.float_t, ndim=1] c_outer = np.asarray(self.c_outer)
-        self.fba_prob = GLPKfva(cobra_model, c_inner, c_outer, self.fva_tol)
+        self.fba_prob = GLPKfva(cobra_model, c_inner, c_outer, self.fva_tol,
+                                self.verbosity)
 
     
 

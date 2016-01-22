@@ -5,13 +5,13 @@ cdef class GLPKfba:
 
     cdef glp_prob *lp
     cdef glp_smcp *opt
-    cdef int m, n
-    cdef int set_objective(self, np.ndarray[np.float_t, ndim=1] c) except -1
+    cdef int m, n, verbosity
+    cdef int set_objective(self, np.ndarray[np.float_t, ndim=1] c)
     cdef int set_obj_i(self, int j, double obj)
     cdef int set_bounds(self, 
                         np.ndarray[np.float_t, ndim=1] lb,
-                        np.ndarray[np.float_t, ndim=1] ub) except -1
-    cdef int set_bounds_i(self, int i, float lb, float ub) except -1
+                        np.ndarray[np.float_t, ndim=1] ub)
+    cdef int set_bounds_i(self, int i, float lb, float ub)
     cpdef int solve(self)
     cdef double get_objective(self)
     cpdef np.ndarray[np.float_t, ndim=1] get_fluxes(self)

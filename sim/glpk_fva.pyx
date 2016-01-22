@@ -5,12 +5,13 @@ cdef class GLPKfva(GLPKfba):
     def __init__(self, cobra_model, 
                  np.ndarray[np.float_t, ndim=1] c_inner,
                  np.ndarray[np.float_t, ndim=1] c_outer,
-                 double fva_tol):
+                 double fva_tol,
+                 int verbosity):
         """ A class to handle the bilevel optimization required by DFVA """
 
         # Using the old style here since I had issues with cython
         # inheretance...
-        GLPKfba.__init__(self, cobra_model)
+        GLPKfba.__init__(self, cobra_model, verbosity)
 
         self.c_inner = c_inner
         self.c_outer = c_outer

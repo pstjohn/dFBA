@@ -1,5 +1,5 @@
 import numpy as np
-from warnings import warn
+import logging
 
 cdef class DFBA_Simulator:
 
@@ -15,7 +15,8 @@ cdef class DFBA_Simulator:
     def __init__(self, cobra_model, 
                  np.ndarray[np.int32_t, ndim=1] reaction_indices,
                  np.ndarray[np.float_t, ndim=1] y0, 
-                 ReactionBoundsFunction bounds_func
+                 ReactionBoundsFunction bounds_func,
+                 verbosity=True,
                  ):
         """ A class to handle the solution of the dynamic flux balance problem
         specified by the passed cobra_model and bounds_func.
@@ -37,6 +38,8 @@ cdef class DFBA_Simulator:
             concentration.
 
         """
+
+        self.verbosity = int(verbosity)
 
         self._initialize_lp(cobra_model)
 
@@ -69,7 +72,7 @@ cdef class DFBA_Simulator:
     def _initialize_lp(self, cobra_model):
         """ Initialize LP solution. (Placed in separate method for inheretance)
         """
-        self.fba_prob = glp.GLPKfba(cobra_model)
+        self.fba_prob = glp.GLPKfba(cobra_model, self.verbosity)
         
 
 
@@ -88,7 +91,8 @@ cdef class DFBA_Simulator:
         cdef int flag
         cdef realtype reltol = 1e-6     # scalar relative tolerance            
         cdef realtype abstol = 1e-8     # scalar relative tolerance            
-        cdef long maxnumsteps = 5000
+        cdef realtype minstep = 1E-8
+        cdef long maxnumsteps = 10000
 
         # Initialize ODE
         flag = CVodeInit(self.cvode_mem, f, t0, self.y)
@@ -96,6 +100,10 @@ cdef class DFBA_Simulator:
 
         flag = CVodeSStolerances(self.cvode_mem, reltol, abstol)
         flag = CVodeSetMaxNumSteps(self.cvode_mem, maxnumsteps)
+        flag = CVodeSetErrHandlerFn(self.cvode_mem, err_fn, <void*> self)
+        flag = CVodeSetMinStep(self.cvode_mem, minstep)
+        
+        
 
         flag = CVDense(self.cvode_mem, self.NEQ)
 
@@ -142,6 +150,7 @@ cdef class DFBA_Simulator:
         while True:
 
             flag = CVode(self.cvode_mem, self._ts[iout], self.y, &t_start, CV_NORMAL)
+            # check_cvode_flag(flag, self.verbosity)
 
             if flag == CV_SUCCESS:
     
@@ -299,7 +308,8 @@ cdef int f(realtype t, N_Vector y_nv, N_Vector ydot_nv, void *user_data):
 
     cdef int flag
     flag = self.find_external_fluxes(y)
-    if flag == -1: return -1
+    # if flag == -1: return -1 # Tell cvodes to quit
+    if flag == -1: return +1 # Tell cvodes to keep trying
 
     cdef int i = 0
     for i in range(0, self.NEQ):
@@ -312,52 +322,66 @@ cdef int f(realtype t, N_Vector y_nv, N_Vector ydot_nv, void *user_data):
     return 0
 
 
-cdef void check_cvode_flag(int flag):
+cdef void err_fn(int error_code, const char *module, const char *function,
+                 char *msg, void *eh_data):
 
-    if flag == CV_TOO_MUCH_WORK: 
-        warn("CVODE: The solver took mxstep internal steps but could not reach tout")
-    elif flag == CV_TOO_MUCH_ACC:
-        warn("CVODE: The solver could not satisfy the accuracy demanded by the user for some internal step")
-    elif flag == CV_ERR_FAILURE:
-        warn("CVODE: Error test failures occurred too many times during one internal time step or minimum step size was reached")
-    elif flag == CV_CONV_FAILURE:
-        warn("CVODE: Convergence test failures occurred too many times during one internal time step or minimum step size was reached")
-    elif flag == CV_LINIT_FAIL:
-        warn("CVODE: The linear solver's initialization function failed")
-    elif flag == CV_LSETUP_FAIL:
-        warn("CVODE: The linear solver's setup function failed in an unrecoverable manner")
-    elif flag == CV_LSOLVE_FAIL:
-        warn("CVODE: The linear solver's solve function failed in an unrecoverable manner")
-    elif flag == CV_RHSFUNC_FAIL:
-        warn("CVODE: The right-hand side function failed in an unrecoverable manner")
-    elif flag == CV_FIRST_RHSFUNC_ERR:
-        warn("CVODE: The right-hand side function failed at the first call")
-    elif flag == CV_REPTD_RHSFUNC_ERR:
-        warn("CVODE: The right-hand side function had repetead recoverable errors")
-    elif flag == CV_UNREC_RHSFUNC_ERR:
-        warn("CVODE: The right-hand side function had a recoverable error, but no recovery is possible")
-    elif flag == CV_RTFUNC_FAIL:
-        warn("CVODE: The rootfinding function failed in an unrecoverable manner")
-    elif flag == CV_MEM_FAIL:
-        warn("CVODE: A memory allocation failed")
-    elif flag == CV_MEM_NULL:
-        warn("CVODE: The cvode_mem argument was NULL")
-    elif flag == CV_ILL_INPUT:
-        warn("CVODE: One of the function inputs is illegal")
-    elif flag == CV_NO_MALLOC:
-        warn("CVODE: The CVODE memory block was not allocated by a call to CVodeMalloc")
-    elif flag == CV_BAD_K:
-        warn("CVODE: The derivative order k is larger than the order used")
-    elif flag == CV_BAD_T:
-        warn("CVODE: The time t s outside the last step taken")
-    elif flag == CV_BAD_DKY:
-        warn("CVODE: The output derivative vector is NULL")
-    elif flag == CV_TOO_CLOSE:
-        warn("CVODE: The output and initial times are too close to each other")
+    cdef DFBA_Simulator self = <DFBA_Simulator> eh_data
+    if self.verbosity == 1:
+        logging.error(<bytes> module + ':' + <bytes> function + ': '
+                      + <bytes> msg)
+        
 
 
 
-    # warnings.warn_explicit("a warning", category=UserWarning, filename=__FILE__, lineno=__LINE__)
+
+
+
+cdef void check_cvode_flag(int flag, int verbosity):
+
+    if verbosity == 1:
+        if flag == CV_TOO_MUCH_WORK: 
+            logging.error("CVODE: The solver took mxstep internal steps but could not reach tout")
+        elif flag == CV_TOO_MUCH_ACC:
+            logging.error("CVODE: The solver could not satisfy the accuracy demanded by the user for some internal step")
+        elif flag == CV_ERR_FAILURE:
+            logging.error("CVODE: Error test failures occurred too many times during one internal time step or minimum step size was reached")
+        elif flag == CV_CONV_FAILURE:
+            logging.error("CVODE: Convergence test failures occurred too many times during one internal time step or minimum step size was reached")
+        elif flag == CV_LINIT_FAIL:
+            logging.error("CVODE: The linear solver's initialization function failed")
+        elif flag == CV_LSETUP_FAIL:
+            logging.error("CVODE: The linear solver's setup function failed in an unrecoverable manner")
+        elif flag == CV_LSOLVE_FAIL:
+            logging.error("CVODE: The linear solver's solve function failed in an unrecoverable manner")
+        elif flag == CV_RHSFUNC_FAIL:
+            logging.error("CVODE: The right-hand side function failed in an unrecoverable manner")
+        elif flag == CV_FIRST_RHSFUNC_ERR:
+            logging.error("CVODE: The right-hand side function failed at the first call")
+        elif flag == CV_REPTD_RHSFUNC_ERR:
+            logging.error("CVODE: The right-hand side function had repetead recoverable errors")
+        elif flag == CV_UNREC_RHSFUNC_ERR:
+            logging.error("CVODE: The right-hand side function had a recoverable error, but no recovery is possible")
+        elif flag == CV_RTFUNC_FAIL:
+            logging.error("CVODE: The rootfinding function failed in an unrecoverable manner")
+        elif flag == CV_MEM_FAIL:
+            logging.error("CVODE: A memory allocation failed")
+        elif flag == CV_MEM_NULL:
+            logging.error("CVODE: The cvode_mem argument was NULL")
+        elif flag == CV_ILL_INPUT:
+            logging.error("CVODE: One of the function inputs is illegal")
+        elif flag == CV_NO_MALLOC:
+            logging.error("CVODE: The CVODE memory block was not allocated by a call to CVodeMalloc")
+        elif flag == CV_BAD_K:
+            logging.error("CVODE: The derivative order k is larger than the order used")
+        elif flag == CV_BAD_T:
+            logging.error("CVODE: The time t s outside the last step taken")
+        elif flag == CV_BAD_DKY:
+            logging.error("CVODE: The output derivative vector is NULL")
+        elif flag == CV_TOO_CLOSE:
+            logging.error("CVODE: The output and initial times are too close to each other")
+
+
+
 
 
 # cdef class ReactionBoundsFunction:
